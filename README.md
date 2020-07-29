@@ -10,9 +10,9 @@ The following is an example of a trained agent in the environment.
 
 ## Problem Statement
 ### Environment and Rewards:
-An open 3D space surrounded by four solid walls is created and randomly populated with blue and yellow bananas. An agent is then placed in the environment and given a reward of $+1$ for collecting a yellow banana, and a reward of $-1$ for collecting a blue banana. The goal of the agent is to collect as many yellow bananas as possible while avoiding blue bananas. The environment is episodic and runs for $1000$ timesteps after which it is reset.
+An open 3D space surrounded by four solid walls is created and randomly populated with blue and yellow bananas. An agent is then placed in the environment and given a reward of `+1` for collecting a yellow banana, and a reward of `-1` for collecting a blue banana. The goal of the agent is to collect as many yellow bananas as possible while avoiding blue bananas. The environment is episodic and runs for `1000` timesteps after which it is reset.
 ### State and Action Spaces:
-The agent's observation of the underlying state space has $37$ dimensions and contains the agent's velocity and ray-based perception of objects around the agent's forward direction. Given this information, the agent has to learn how to best select actions to maximise its total episodic reward. Four discrete actions are available to the agent at each timestep, corresponding to:
+The agent's observation of the underlying state space has `37` dimensions and contains the agent's velocity and ray-based perception of objects around the agent's forward direction. Given this information, the agent has to learn how to best select actions to maximise its total episodic reward. Four discrete actions are available to the agent at each timestep, corresponding to:
 
 | Input  | Action        
 | ------ | ------
@@ -23,7 +23,7 @@ The agent's observation of the underlying state space has $37$ dimensions and co
 
 
 ### Solution:
-The task is classed as solved when an agent can achieve an average score of +13 over 100 consecutive episodes.
+The task is classed as solved when an agent can achieve an average score of `+13` over 100 consecutive episodes.
 
 ## Dependencies
 To run this code you must run an environment with Python 3.6 kernel and the dependencies listed in `requirements.txt`. 
