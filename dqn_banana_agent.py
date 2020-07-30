@@ -37,7 +37,6 @@ class ReplayBuffer():
 
     def sample(self, batch_size):
         """Returns a sampled batch of experiences."""
-
         sampled_batch = random.sample(self.memory, batch_size)
 
         states = []
@@ -346,7 +345,7 @@ def test_agent(env, agent, episodes, print_scores=False, quick_view=True):
         agent (DQNAgent): A DQN agent to act in the environment
         episodes (int): Number of episodes to test over
         print_scores (bool): Set True to prints episode score after each episode
-        quick_view (bool): Set False to run enviroment in slow mode and observer agents actions
+        quick_view (bool): Set False to run environment in slow mode and observer agents actions
     """
     brain_name = env.brain_names[0]
 
