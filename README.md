@@ -23,7 +23,7 @@ The agent's observation of the underlying state space has `37` dimensions and co
 
 
 ### Solution:
-The task is classed as solved when an agent can achieve an average score of `+13` over 100 consecutive episodes.
+The task is classed as solved when an agent can achieve an average score of `+13` over `100` consecutive episodes.
 
 ## Dependencies
 To run this code you must run an environment with Python 3.6 kernel and the dependencies listed in `requirements.txt`. 

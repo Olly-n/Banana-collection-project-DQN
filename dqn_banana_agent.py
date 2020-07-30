@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import pandas as pd
 from collections import deque, namedtuple
 
 
@@ -103,7 +102,7 @@ class QNetwork(nn.Module):
 class DQNAgent():
     """A deep Q network agent.
 
-    A deep Q network agent with a standard replay buffer, soft target update
+    An agent using a deep Q network with a standard replay buffer, soft target update
     and linear epsilon decay.
     """
 
