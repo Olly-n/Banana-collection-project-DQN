@@ -4,60 +4,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from collections import deque, namedtuple
+from replay_buffers import PrioritisedReplayBuffer, ReplayBuffer
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("device = ", device)
-
-
-class ReplayBuffer():
-    """A replay buffer.
-
-    Used to store a fixed number of experience tuples obtained while interacting
-    with the environment.
-    """
-
-    def __init__(self, buffer_size, seed):
-        """Creates a replay buffer.
-
-        Args:
-            buffer_size (int): Maximum size of the replay buffer.
-            seed (int): Random seed used for batch selection.
-        """
-
-        self.memory = deque(maxlen=buffer_size)
-        self.seed = random.seed(seed)
-        self.experience = namedtuple("experience", ["state", "action", "reward", "next_state", "done"])
-
-    def add(self, state, action, reward, next_state, done):
-        """Creates experience tuple and adds it to the replay buffer."""
-        experience = self.experience(state, action, reward, next_state, done)
-        self.memory.append(experience)
-
-    def sample(self, batch_size):
-        """Returns a sampled batch of experiences."""
-        sampled_batch = random.sample(self.memory, batch_size)
-
-        states = []
-        actions = []
-        rewards = []
-        next_states = []
-        done_list = []
-
-        for sample in sampled_batch:
-            state, action, reward, next_state, done = sample
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            next_states.append(next_state)
-            done_list.append(done)
-
-        return states, actions, rewards, next_states, done_list
-
-    def __len__(self):
-        """Return number of experiences in the replay buffer."""
-        return len(self.memory)
 
 
 class QNetwork(nn.Module):
@@ -101,38 +52,70 @@ class QNetwork(nn.Module):
 class DQNAgent():
     """A deep Q network agent.
 
-    An agent using a deep Q network with a standard replay buffer, soft target update
-    and linear epsilon decay.
+    An agent using a deep Q network with a replay buffer, soft target update
+    and linear epsilon decay that can learn to solve a task by interacting with
+    its environment. Includes option to train using double deep Q learning
+    and prioritised replay buffer.
     """
 
-    def __init__(self, buffer_size, seed, state_size, action_size,
-                 hidden_layers, epsilon, epsilon_decay, epsilon_min,
-                 gamma, tau, learning_rate, update_frequency, step_number=0, scores = None):
+    def __init__(
+        self,
+        buffer_size,
+        seed,
+        state_size,
+        action_size,
+        hidden_layers,
+        epsilon,
+        epsilon_decay,
+        epsilon_min,
+        gamma,
+        tau,
+        learning_rate,
+        update_frequency,
+        double_Q=False,
+        prioritised_replay_buffer=False,
+        alpha=None,
+        beta=None,
+        beta_increment_size=None,
+        base_priority=None,
+        max_priority=None,
+        training_scores=None,
+        step_number=0,
+    ):
         """DQNAgent initialisation function.
 
         Args:
 
-            buffer_size (int): Maximum size of the replay buffer
-            seed (int): Random seed used for batch selection
+            buffer_size (int): maximum size of the replay buffer.
+            seed (int): random seed used for batch selection.
 
-            state_size (int): dimension of state space for input to Q network
-            action_size (int): dimension of action space for value predictions
-            hidden_layers (list[int]): list of dimensions for the hidden layers required
+            state_size (int): dimension of state space for input to Q network.
+            action_size (int): dimension of action space for value predictions.
+            hidden_layers (list[int]): list of dimensions for the hidden layers required.
 
-            epsilon (int): probability of choosing non-greedy action in policy
-            epsilon_decay (int): linear decay rate of epsilon with after each step
-            epsilon_min (int): a floor for the decay of epsilon
+            epsilon (float): probability of choosing non-greedy action in policy.
+            epsilon_decay (float): linear decay rate of epsilon with after each step.
+            epsilon_min (float): a floor for the decay of epsilon.
 
-            gamma (int): discount factor for future expected returns
-            tau (int): soft update factor used to define how much to shift 
-                       target network parameters towards current network parameter
+            gamma (float): discount factor for future expected returns.
+            tau (float): soft update factor used to define how much to shift.
+                       target network parameters towards current network parameter.
 
-            learning_rate (int): learning rate for gradient decent optimisation
-            update_frequency (int): how often to update target Q network parameters
-            
-            step_number (int): number of steps the agent has taken (this is primarily 
-                               used to reloading saved agents)
-            scores (list[int]): rewards gained in previous traing episodes (this is primarily 
+            learning_rate (float): learning rate for gradient decent optimisation.
+            update_frequency (int): how often to update target Q network parameters.
+
+            double_Q (bool): set true to train using double deep Q learning.
+
+            priority_replay_buffer (bool): set true to use priority replay buffer.
+            alpha (float): priority scaling hyperparameter.
+            beta_zero (float): importance sampling scaling hyperparameter.
+            beta_increment_size (float): beta annealing rate.
+            base_priority (float): base priority to ensure non-zero sampling probability.
+            max_priority (float): initial maximum priority.
+
+            training_scores (list[int]): rewards gained in previous traing episodes. (this is primarily 
+                                used to reloading saved agents)
+            step_number (int): number of steps the agent has taken. (this is primarily 
                                 used to reloading saved agents)
 
         Notes: Setting tau = 1 will return classic DQN with full target update.
@@ -141,7 +124,18 @@ class DQNAgent():
 
         self.buffer_size = buffer_size
         self.seed = seed
-        self.replay_buffer = ReplayBuffer(buffer_size, seed)
+        if prioritised_replay_buffer:
+            self.replay_buffer = PrioritisedReplayBuffer(
+                buffer_size,
+                alpha,
+                beta,
+                beta_increment_size,
+                base_priority,
+                max_priority,
+                seed,
+            )
+        else:
+            self.replay_buffer = ReplayBuffer(buffer_size, seed)
 
         self.state_size = state_size
         self.action_size = action_size
@@ -161,11 +155,20 @@ class DQNAgent():
         self.learning_rate = learning_rate
         self.update_frequency = update_frequency
 
+        self.double_Q = double_Q
+
+        self.prioritised_replay_buffer = prioritised_replay_buffer
+        self.alpha = alpha
+        self.beta = beta
+        self.beta_increment_size = beta_increment_size
+        self.base_priority = base_priority
+        self.max_priority = max_priority
+
         self.step_number = step_number
-        if scores is None:
+        if training_scores is None:
             self.training_scores = []
         else:
-            self.training_scores = scores
+            self.training_scores = training_scores
 
     def step(self, state, action, reward, next_state, done, batch_size):
         """
@@ -175,7 +178,7 @@ class DQNAgent():
         """
         self.replay_buffer.add(state, action, reward, next_state, done)
         self.update_Q(batch_size)
-        self.epsilon = max(self.epsilon*self.epsilon_decay, self.epsilon_min)
+        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         self.step_number += 1
         if self.step_number % self.update_frequency == 0:
@@ -183,7 +186,6 @@ class DQNAgent():
 
     def act_epsilon_greedy(self, state, greedy=False):
         """ Returns an epsilon greedy action """
-
         if greedy or random.random() > self.epsilon:
             state = torch.from_numpy(state).unsqueeze(0).to(device)
             self.Q_net.eval()
@@ -200,7 +202,7 @@ class DQNAgent():
         and experiences from the replay buffer.
         """
 
-        if len(self.replay_buffer) > batch_size:
+        if len(self.replay_buffer) > 2*batch_size:
 
             experience = self.replay_buffer.sample(batch_size)
 
@@ -210,12 +212,26 @@ class DQNAgent():
             next_states = torch.FloatTensor(experience[3]).to(device)
             done_tensor = torch.FloatTensor(experience[4]).unsqueeze(1).to(device)
 
-            Q_target_next = torch.max(self.target_Q(next_states).detach(), 1, keepdim=True)[0]
-            Q_target = rewards + self.gamma*Q_target_next*(1 - done_tensor)
+            target_Q_net_max = torch.max(self.target_Q(next_states).detach(), 1, keepdim=True)
+
+            if self.double_Q:
+                target_actions = target_Q_net_max[1]
+                Q_target_next = self.Q_net(next_states).detach().gather(1, target_actions)
+            else:
+                Q_target_next = target_Q_net_max[0]
 
             Q_expected = self.Q_net(states).gather(1, actions)
+            Q_target = rewards + self.gamma * Q_target_next * (1 - done_tensor)
 
-            loss = F.mse_loss(Q_expected, Q_target)
+            if self.prioritised_replay_buffer:
+                idx_list = experience[5]
+                weights = torch.FloatTensor(experience[6]).unsqueeze(1).to(device)
+                td_error = (Q_target - Q_expected)
+                priority_list = torch.abs(td_error.squeeze().detach()).cpu().numpy()
+                self.replay_buffer.update(idx_list, priority_list)
+                loss = torch.mean((weights*td_error)**2)
+            else:
+                loss = F.mse_loss(Q_expected, Q_target)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -224,31 +240,51 @@ class DQNAgent():
     def soft_update_target_Q(self):
         """ Soft updates the target Q network """
         for target_Q_param, Q_param in zip(self.target_Q.parameters(), self.Q_net.parameters()):
-            target_Q_param.data = self.tau*Q_param.data + (1 - self.tau)*target_Q_param.data
+            target_Q_param.data = self.tau * Q_param.data + (1 - self.tau) * target_Q_param.data
 
     def save_agent(self, name, path=""):
         """ Saves agent parameters for loading using load_agent function
         Note: it is torch convention to save models with .pth extension
         """
-        params = (self.buffer_size, self.seed, self.state_size, self.action_size,
-                  self.hidden_layers, self.epsilon, self.epsilon_decay,
-                  self.epsilon_min, self.gamma, self.tau, self.learning_rate,
-                  self.update_frequency, self.step_number, self.training_scores)
+        params = (
+            self.buffer_size,
+            self.seed,
+            self.state_size,
+            self.action_size,
+            self.hidden_layers,
+            self.epsilon,
+            self.epsilon_decay,
+            self.epsilon_min,
+            self.gamma,
+            self.tau,
+            self.learning_rate,
+            self.update_frequency,
+            self.double_Q,
+            self.prioritised_replay_buffer,
+            self.alpha,
+            self.replay_buffer.beta,
+            self.beta_increment_size,
+            self.base_priority,
+            self.max_priority,
+            self.training_scores,
+            self.step_number,
+        )
 
-        checkpoint = {"params": params,
-                      "state_dict": self.Q_net.state_dict(),
-                      "optimizer_state_dict": self.optimizer.state_dict()
-                      }
+        checkpoint = {
+            "params": params,
+            "state_dict": self.Q_net.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+        }
 
         path += name
         torch.save(checkpoint, path)
 
 
-def load_agent(file_path):
+def load_agent(file_path, show_parameter = False):
     """ Reloads agents saved using DQNAgent.save_agent function.
 
     Args:
-        file_path (str): The file path of the saved agent being reloaded
+        file_path (str): The file path of the saved agent being reloaded.
     """
     checkpoint = torch.load(file_path)
     agent = DQNAgent(*checkpoint["params"])
@@ -256,9 +292,11 @@ def load_agent(file_path):
     agent.target_Q.load_state_dict(checkpoint["state_dict"])
     agent.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
-    print("Agent loaded with parameters: \n", agent.__dict__)
+    if show_parameter:
+        print("Agent loaded with parameters: \n", agent.__dict__)
 
     return agent
+
 
 def criterion_check(agent):
     """Checks if the enviroment has been solved.
@@ -270,14 +308,14 @@ def criterion_check(agent):
         agent (DQNAgent): A trained agent.
     """
     train_scores = agent.training_scores
-    avg_score = sum(train_scores[:99])/100
+    avg_score = sum(train_scores[:99]) / 100
     i = 100
     for first, last in zip(train_scores[:-99], train_scores[99:]):
-        avg_score += last/100
+        avg_score += last / 100
         if avg_score >= 13:
             print("Criterion passed on episode {}.".format(i))
             return i
-        avg_score -= first/100
+        avg_score -= first / 100
         i += 1
     print("Criterion not passed.")
     return None
@@ -290,8 +328,8 @@ def train_agent(env, agent, episodes, batch_size, name, path="", print_every=100
     the final agent and of the agent that scored the highest average score.
 
     Args:
-        env (Unity environment): A Unity environment for the agent to act in
-        agent (DQNAgent): A DQN agent to act in the environment
+        env (Unity environment): A Unity environment in which the agent can act.
+        agent (DQNAgent): A DQN agent to act in the environment.
         episodes (int): Number of episode to train the agent on
         batch_size (int): Size of experience batch used to train the model
         name (str): Name used to save the best preforming and final agent
@@ -330,7 +368,7 @@ def train_agent(env, agent, episodes, batch_size, name, path="", print_every=100
                 agent.save_agent(name_best, path)
                 print("Best agent so far has been saved.")
 
-            print("Episode: {}  Average Score: {}".format(i+1, avg_score))
+            print("Episode: {}  Average Score: {}".format(i + 1, avg_score))
 
     agent.save_agent(name, path)
     print("final agent has been saved.")
@@ -367,5 +405,8 @@ def test_agent(env, agent, episodes, print_scores=False, quick_view=True):
         if print_scores:
             print("episode score = ", score)
         episode_scores.append(score)
-    print("Average reward over {} tests was {} with a SD of {}".format(episodes,np.mean(episode_scores),np.std(episode_scores)))
+    print("Average reward over {} tests was {} with a SD of {}".format(
+            episodes, np.mean(episode_scores), np.std(episode_scores)
+    ))
+
     return episode_scores
