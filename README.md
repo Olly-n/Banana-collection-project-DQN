@@ -2,7 +2,7 @@
 -----
 
 ## Description
-For this project an agent was trained using a custom implementation of the deep Q learning algorithm to navigate around an open world environment. The agent was reward for collect yellow bananas and avoiding blue bananas. The implementation was then extended to include both priorities experience replay and double deep Q learning methods to compare the sample efficiencies between these methods.
+For this project an agent was trained using a custom implementation of the deep Q learning algorithm to navigate around an open world environment. The agent was rewarded for collect yellow bananas and avoiding blue bananas. The implementation was then extended to include both priorities experience replay and double deep Q learning methods to compare the sample efficiencies between a vanilla implementation and these methods.
 The following is an example of a trained agent in the environment.
 
 ![](Gifs/preview2.gif)
@@ -60,19 +60,21 @@ Initially, deep Q networks (DQN) were trained using a standard experience replay
 | Hidden layer 2  | 64
 | Hidden layer 3  | 32
 | Output (Action) | 4
+
 where each layer is fully connected and followed by a ReLU activation function.
 
 Additionally, the agents was trained with experience batches of size 128 and the hyperparameter setting used are described in the table below:
 | Hyperparameter | Value
 | -----          | -----
-|`replay buffer size` | 20000 steps
-|`epsilon` | 0.02
-|`epsilon decay rate`| 0.99995
-|`minimum epsilon`| 0.02
-|`gamma`| 0.95
-|`tau`| 0.001
-|`learning rate`| 0.0003
-|`soft update frequency`| 5
+|replay buffer size | 20000 steps
+|epsilon | 0.02
+|epsilon decay rate| 0.99995 /step
+|minimum epsilon| 0.02
+|gamma| 0.95
+|tau| 0.001
+|learning rate| 0.0003
+|soft update frequency| 5 steps
+
 Using these setting an agent was trained that could solve the problem after `458` episodes. This agent was used as a baseline to compare the training efficiency other variation of the algorithm.
 
 Firstly, the algorithm was extended to include double deep Q learning. Using a double deep method but leaving the network architecture and all other hyperparameters the same, an agent was created that solved the problem in `356` episodes representing a `23%` increase in sample efficiency.
@@ -80,17 +82,18 @@ Firstly, the algorithm was extended to include double deep Q learning. Using a d
 A prioritised experience replay (PER) buffer was then added to test how this would improve the efficiency. The parameters used for the PER buffer were as follows: 
 | Hyperparameter | Value
 | -----          | -----
-|`alpha` | 0.7
-|`initial beta` | 0.5
-|`beta increment per step`| 0.0001
-|`baseline priority`| 0.1
-|`maximum priority`| 1
+|alpha | 0.7
+|initial beta | 0.5
+|beta increment per step| 0.0001
+|baseline priority| 0.1
+|maximum priority| 1
+
 and all other agent hyperparameters were kept the same as the initial two agent.
-Using only a PER buffer an agent was trained that could solve the environment in `387` episodes, which is an increase in sample effciency of `15%`.
+Using only a PER buffer an agent was trained that could solve the environment in `387` episodes, which is a `15%` increase in sample effciency.
 Finally an agent was trained using both a PER and a double deep Q method and was found to solve the environment in `244` episodes which is `46%` more sample efficient that the standard implementation initially used.
 
 The following graph shows the average score over the previous 100 episodes during the training process for each of the above agents. In this graph it can clearly be seen that both PER and double deep Q learning offer very similar improvements in training efficiency and when combined the efficiency gains were much greater.
-Interestingly, this graph also shows that the PER and the double deep Q method benefit different aspects of training. By inspecting the two agents trained using the double Q method it is clear that the reduction in bias in the bootstrapping term has greatly increases the learning rate throughout training. However, in both the standard and double only cases it can be seen that the learning rate drops once the agent is achieving an average score of around 10 per an episode. With the addition of a PER buffer this drop in learning rate in the later stages of training is not observed as the biases selection of experience tuples allows for quicker refinement of an already relatively strong policy.
+Interestingly, this graph also shows that the PER and the double deep Q method benefit different aspects of training. By inspecting the two agents trained using the double Q method it is clear that the reduction in bias in the bootstrapping term has greatly increases the learning rate throughout training. However, in both the standard and double only cases it can be seen that the learning rate drops once the agent is achieving an average score of around 10 per an episode. With the addition of a PER buffer this drop in learning rate in the later stages of training is not observed as the biases selection of experience tuples allows for better refinement of an already relatively strong policy.
 
 ![](Graphs/Comparison_plot.png)
 
