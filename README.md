@@ -68,7 +68,7 @@ Additionally, the agents was trained with experience batches of size 128 and the
 | -----          | -----
 |replay buffer size | 20000 steps
 |epsilon | 0.02
-|epsilon decay rate| 0.99995 /step
+|epsilon decay rate per step| 0.99995
 |minimum epsilon| 0.02
 |gamma| 0.95
 |tau| 0.001
