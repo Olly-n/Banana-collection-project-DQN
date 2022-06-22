@@ -2,5 +2,5 @@ unityagents==0.4.0
 matplotlib==3.0.3
 pandas==1.0.4
 torch==1.5.1
-numpy==1.18.1
+numpy==1.22.0
 jupyter
